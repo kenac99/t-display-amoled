@@ -91,6 +91,12 @@ int brightness_mode = 0; // 0=auto, 1=full, 2=dim, 3=medium
 const uint8_t manual_levels[] = {0, 255, 40, 128};
 float battery_voltage = 0.0;
 
+// Battery float voltage management
+// REG06[7:2] = VREG: 3.840V + (val × 16mV)
+const uint8_t VREG_4208MV = 0x17;  // 4.208V = 3.840 + (23 × 0.016)
+const uint8_t VREG_4000MV = 0x0A;  // 4.000V = 3.840 + (10 × 0.016)
+bool float_mode_active = false;
+
 // Fonts
 extern "C" {
   extern const lv_font_t ds_digib_120;
@@ -184,10 +190,40 @@ void configure_battery_charging() {
   Serial.println("✓ Charging configured");
 }
 
-bool is_charging() {
+// CHRG_STAT in REG0B[4:3]: 00=Not charging, 01=Pre-charge, 10=Fast charging, 11=Charge done
+uint8_t get_charge_state() {
   uint8_t stat = i2cRead(BQ, 0x0B);
-  if (stat == 0xFF) return false;
-  return (stat >> 2) & 1;
+  if (stat == 0xFF) return 0;
+  return (stat >> 3) & 0x03;
+}
+
+bool is_charging() {
+  uint8_t state = get_charge_state();
+  return (state == 1 || state == 2);  // Pre-charge or fast charging
+}
+
+bool is_charge_done() {
+  return get_charge_state() == 3;  // Charge termination done
+}
+
+void set_charge_voltage(uint8_t vreg) {
+  i2cWriteMask(BQ, 0x06, 0xFC, (vreg << 2));
+}
+
+// Float voltage management - charge to 4.2V, then drop to 4.0V for longevity
+void manage_float_voltage() {
+  if (!float_mode_active && is_charge_done()) {
+    // Just finished charging - drop to float voltage
+    set_charge_voltage(VREG_4000MV);
+    float_mode_active = true;
+    Serial.println("🔋 Charge complete - dropping to 4.0V float");
+  }
+  else if (float_mode_active && battery_voltage < 3.9) {
+    // Battery has discharged below threshold - restore full charge voltage
+    set_charge_voltage(VREG_4208MV);
+    float_mode_active = false;
+    Serial.println("🔋 Battery low - restoring 4.2V charge");
+  }
 }
 
 // ============================================================================
@@ -408,10 +444,15 @@ void update_display(lv_timer_t*) {
   battery_voltage = amoled.getBattVoltage() / 1000.0;
   int batt_pct = (int)((battery_voltage - 3.0) / 1.2 * 100.0);
   batt_pct = constrain(batt_pct, 0, 100);
-  
+
+  // Manage float voltage for battery longevity
+  manage_float_voltage();
+
   char status[64];
   if (is_charging()) {
     snprintf(status, sizeof(status), "chg %d%% - %s", batt_pct, WiFi.localIP().toString().c_str());
+  } else if (float_mode_active) {
+    snprintf(status, sizeof(status), "flt %d%% - %s", batt_pct, WiFi.localIP().toString().c_str());
   } else {
     snprintf(status, sizeof(status), "bat %d%% - %s", batt_pct, WiFi.localIP().toString().c_str());
   }
