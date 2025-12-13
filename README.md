@@ -84,3 +84,4 @@ MIT
 - [LilyGo](https://www.lilygo.cc/) for the hardware
 - [DS-Digital Font](https://www.dafont.com/ds-digital.font) by Dusit Supasawat
 - [LVGL](https://lvgl.io/) graphics library
+- [sunset](https://github.com/buelowp/sunset) by Peter Buelow - sunrise/sunset calculation approach
