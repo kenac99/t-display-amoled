@@ -10,7 +10,7 @@ A retro 80s-style 7-segment LED clock for the LilyGo T-Display S3 AMOLED (1.91" 
 - **Web Configuration** - Change all settings from your browser at `http://clock.local`
 - **Auto Brightness** - Dims at sunset, brightens at sunrise based on your location
 - **Touch Controls** - Tap screen to cycle brightness modes (Auto → Full → Dim → Medium)
-- **Battery Charging** - Properly configured BQ25896 charging IC (1A charge rate)
+- **Battery Charging** - BQ25896 with float voltage for battery longevity
 - **WiFi Reconnection** - Automatically reconnects if connection drops
 - **NVS Persistence** - Settings survive reboots
 
@@ -73,7 +73,17 @@ The BQ25896 is configured for:
 - 4.208V charge voltage
 - Proper VINDPM and input current limits
 
-Battery percentage is calculated from voltage (3.0V = 0%, 4.2V = 100%).
+### Float Voltage for Longevity
+
+LiPo cells degrade faster when held at full charge (4.2V). To extend battery life, the clock implements float voltage management:
+
+1. **Charging** (`chg`) - Charges to 4.2V normally
+2. **Float** (`flt`) - After charge completes, drops to 4.0V float
+3. **Recharge** - When battery falls below 3.9V, restores full charging
+
+This keeps the battery around 80% when plugged in, significantly extending cycle life while still providing plenty of runtime if unplugged.
+
+Battery percentage uses smoothed voltage readings (3.2V = 0%, 4.2V = 100%) with an exponential moving average to filter ADC noise.
 
 ## License
 
