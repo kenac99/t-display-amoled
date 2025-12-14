@@ -1,4 +1,4 @@
-# T-Display S3 AMOLED Flip Clock
+# T-Display S3 AMOLED Retro 7 Segment LED Clock
 
 A retro 80s-style 7-segment LED clock for the LilyGo T-Display S3 AMOLED (1.91" model). Features web-based configuration, automatic sunrise/sunset brightness, and proper battery charging.
 
