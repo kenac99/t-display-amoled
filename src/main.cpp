@@ -90,6 +90,7 @@ uint8_t target_brightness = 200;
 int brightness_mode = 0; // 0=auto, 1=full, 2=dim, 3=medium
 const uint8_t manual_levels[] = {0, 255, 40, 128};
 float battery_voltage = 0.0;
+float smoothed_voltage = 0.0;  // Smoothed battery voltage (EMA filter)
 
 // Battery float voltage management
 // REG06[7:2] = VREG: 3.840V + (val × 16mV)
@@ -442,7 +443,16 @@ void update_display(lv_timer_t*) {
   }
   
   battery_voltage = amoled.getBattVoltage() / 1000.0;
-  int batt_pct = (int)((battery_voltage - 3.0) / 1.2 * 100.0);
+
+  // Exponential moving average to smooth out ADC noise
+  // Alpha of 0.05 = slow response, very smooth. Takes ~60 readings to stabilize.
+  if (smoothed_voltage == 0.0) {
+    smoothed_voltage = battery_voltage;  // Initialize on first reading
+  } else {
+    smoothed_voltage = 0.05 * battery_voltage + 0.95 * smoothed_voltage;
+  }
+
+  int batt_pct = (int)((smoothed_voltage - 3.2) / 1.0 * 100.0);  // 3.2V=0%, 4.2V=100%
   batt_pct = constrain(batt_pct, 0, 100);
 
   // Manage float voltage for battery longevity
